@@ -1,0 +1,146 @@
+---
+title: "Trust in the Government by Political Affiliation"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+date: "2025-10-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+In recent years, it seems that public distrust has grown. Pew Research Center data indicate that Democrats are more trusting of national and local news than Republicans^1^. However, regardless of party affiliation, Americans tend to be more trusting of the government to do what's right when the party they lean toward is in control^2^.
+
+Given this background and knowing that the sitting president in 2024, Joe Biden, represented the Democratic Party, we theorize that Republicans in 2024 were less trusting in the government to do what's right than Democrat voters at that same time. To test this hypothesis, we use the 2024 American National Election Studies (ANES) time-series data to answer the following question:
+
+*In 2024, were Democrats or Republicans more trusting in the government to do what's right?*
+
+Answering this question would support Pew Research Center's findings and could help future candidates from either party understand the potential value of building trust among opposing voters.
+
+# Data and Methodology
+
+Our analysis uses data from the 2024 American National Election Studies (ANES), an observational dataset based on a sample of respondents drawn from the YouGov platform. The YouGov panel is not nationally representative and consists of participants who volunteer to complete questionnaires in exchange for rewards. This dataset includes 5,521 individuals. We exclude 418 individuals who refused to indicate a party preference and 13 individuals who did not answer the key trust question.
+\par
+We classify individuals as either Republican or Democrat based upon how they placed themselves on a 7-point Likert scale ranging from "Strong Republican" to "Strong Democrat." Selecting "Independent" is the only marker of neutrality; otherwise, the respondents are grouped according to the direction they lean on the scale. There are similar questions on the survey that gather trust-related information, but we chose this item (V241227x) given the high data population and relevance to the Pew Center research and the research question. Although this grouping removes some detail from our dataset, our goal is to draw generalized conclusions about trust in the government among broad Republican and Democratic support bases.
+
+The survey includes an item querying "How often you can trust the federal government in Washington to do what is right?" Responses  are recorded on a 5-point Likert scale that ranges from "Always" to "Never, and the same question is asked to each respondent. We acknowledge that, at the time of the survey, the Democratic Party controlled the federal government. Conclusions drawn from our analysis should keep in mind previous Pew research^2^ on the effect of the controlling party on trust. 
+
+Figure 1 summarizes survey responses, where higher values indicate a greater level of trust (1 = lowest trust, 5 = highest trust).
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# Load libraries
+library(dplyr)
+library(knitr)
+library(ggplot2)
+library(rstatix)
+library(tidyverse)
+library(coin)
+
+# Read csv
+anes <- read.csv("anes_subset.csv") %>% 
+              select (V241227x, V241229) 
+
+# Keep only relevant responses
+anes <- filter(anes,
+          V241227x %in% c(1,2,3,5,6,7),
+          V241229 %in% c(1:5))
+
+# Create trust column to flip 1-5 values so high value relates to high trust
+anes$trust_gvt <- 6 - anes$V241229
+
+# Create party column to indicate D or R
+anes$party <- case_when(anes$V241227x %in% c(1,2,3) ~ "Democrat", 
+                        anes$V241227x %in% c(5,6,7) ~ "Republican")
+anes$party <- factor(anes$party, levels = c("Democrat", "Republican"))
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Plot responses as histogram
+ggplot(anes, aes(x = factor(trust_gvt), fill = party)) +
+  geom_bar(aes(y = ..prop.., group = party), position = "dodge", width = 0.6) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) + # display as %
+  labs(
+    title = "Figure 1: Distribution of Government Trust by Party",
+    x = "Trust in Government",
+    y = "Percentage",
+    fill = "Party"
+  ) +
+  scale_fill_manual(values = c(
+    "Democrat" = "#2E86DE",
+    "Republican" = "#E74C3C"
+  )) +
+  theme_minimal()
+```
+
+
+**Data Characteristics**
+
+The samples are unpaired because each survey respondent provides only one trust score. Therefore, this analysis is based on a two-sample comparison between Democrats and Republicans. 
+
+The trust variable is ordinal, measured on a 5-point Likert scale ranging from “Always” to “Never.” Responses are recorded as discrete numeric values from 1 to 5. Values such as -9, -8, and -1 were removed prior to analysis, as they correspond to refusals, missing data, or inapplicable responses. Because the spacing between Likert-scale categories cannot be assumed equal, we use a test appropriate for ordinal (rather than interval) data.
+
+We assume that responses are independent and identically distributed (IID). Each survey respondent is expected to answer independently, meaning one person’s level of trust should not influence another’s. However, since  ANES uses a clustered sampling design, individuals within the same cluster (e.g., neighborhood or county) may share similar attitudes. As a result, p-values may be slightly optimistic (smaller than their true values). All respondents are drawn from the same population of U.S. adults, so their responses can be treated as identically distributed observations of the same underlying random variable (“trust”).
+
+Finally, because certain groups are more difficult to reach than others,  ANES employs stratified sampling to ensure balanced subgroup representation. The dataset also provides survey weights to correct for over- or under-representation during analysis. Our analysis uses unweighted data, which we acknowledge as a limitation.
+
+**Hypotheses**
+
+Let the random variable T represent a respondent’s level of trust in the government to do what is right. $T_D$ is a randomly drawn trust level from Democrat respondents. $T_R$ is a randomly drawn trust level from Republican respondents.
+
+The null hypothesis states that the probability that a randomly selected Democrat has a higher trust score than a randomly selected Republican is equal to the probability of the reverse. The alternative hypothesis is that these probabilities differ:
+
+- $H_0: P(T_D > T_R) = P(T_R > T_D)$
+- $H_1: P(T_D > T_R) ≠ P(T_R > T_D)$
+
+**Statistical Test: Wilcoxon Rank-Sum (Hypothesis of Comparisons)**
+
+We test the difference in government trust between Democrats and Republicans with the Wilcoxon Rank-Sum test at a 5% significance level. The Wilcoxon Rank-Sum test is a nonparametric test for unpaired samples.  There are two versions, and the hypothesis of means version requires metric data. Therefore, the relevant test for this research question is the hypothesis of comparisons version, which is more general and has a less stringent requirement of at least ordinal scale data. 
+
+The purpose of this test is to understand whether Democrats and Republicans differ in their levels of trust in government by ranking all responses and assessing whether one group tends to have consistently higher or lower values than the other.
+
+# Results
+```{r, results='asis'}
+# Wilcoxon Rank-Sum test (Hypothesis of Comparisons) to compare government trust per party
+wilcox.test(trust_gvt ~ party, data = anes)
+```
+
+The Wilcoxon rank-sum test (hypothesis of comparisons) yielded a p-value less than 0.05. We therefore reject the null hypothesis and conclude that there is a statistically significant difference in government trust levels between Democrats and Republicans.
+
+```{r, results='asis'}
+# Understand practical significance
+effect <- wilcox_effsize(anes, trust_gvt ~ party)
+cat("Effect Size =", effect$effsize, "\n")
+```
+
+To understand the practical significance of this result, we calculated the rank-biserial correlation^3^, a nonparametric effect size measure that indicates whether the observed difference is large enough to be meaningful in practice. The rank-biserial correlation between Republican and Democratic responses on trust in the government to do what is right is approximately 0.3, indicating a moderate difference, where Democrats tend to report higher trust scores than Republicans.
+
+This finding aligns with our expectation based on prior Pew research, as Democrats were moderately more trusting of the government during a period when a Democratic president held office.
+
+# Conclusion
+
+In summary, a Wilcoxon rank-sum test was used to compare trust in government between Democrats and Republicans, consistent with the test’s assumptions of ordinal data and independent, identically distributed (IID) samples. The results showed a statistically significant difference (p < 0.05, exact p-value = 2.2e-16) and a moderate practical difference (r = 0.31), meaning that Democrats tended to report higher trust in government than Republicans.
+
+For future research, it would be interesting to collect data on and conduct a paired pre- and post- election analysis on government trust level between parties. This would help determine whether trust levels of each party shifted after the election, particularly given that a Republican president was elected in 2024. 
+
+# References
+
+^1^ https://www.pewresearch.org/short-reads/2025/05/08/republicans-have-become-more-likely-since-2024-to-trust-information-from-news-outlets-social-media/
+
+^2^ <https://www.pewresearch.org/politics/2024/06/24/public-trust-in-government-1958-2024/> 
+
+^3^ https://www.statisticshowto.com/rank-biserial-correlation/#:~:text=What%20is%20Rank%2DBiserial%20C rrelation,special%20case%20of%20Somers'%20D/
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Check size and mean of gvt trust for D vs R
+party_table <- anes %>%
+group_by(party) %>%
+summarise(count = n(),
+mean_gvt = mean(trust_gvt))
+
+```
+
+
+
