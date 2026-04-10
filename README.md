@@ -19,4 +19,4 @@ This analysis examines whether Democrats and Republicans differ in their trust i
 
 **Files**
 - `anes2024_govtrust.rmd`
-- `anes2024_govtrust.pdf`
+- `anes2024_govtrust.pdf` 
